@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -63,8 +63,6 @@ const generarAlumnos = (): Alumno[] => {
   }));
 };
 
-const random = (min: number, max: number) =>
-  Math.floor(Math.random() * (max - min + 1)) + min;
 
 const generarSemana = () => {
   const alumnos = generarAlumnos();
@@ -89,12 +87,27 @@ const generarSemana = () => {
   return semana;
 };
 
+
+
+const random = (min: number, max: number) =>
+  Math.floor(Math.random() * (max - min + 1)) + min;
+
+
+
 const Entrenador: React.FC = () => {
+  const SEMANA_MOCK = generarSemana();
+
   const [vista, setVista] = useState<Vista>('dia');
   const [diaActual, setDiaActual] = useState(0);
   const [direccion, setDireccion] = useState(1);
 
-  const semana = useMemo(() => generarSemana(), []);
+  const [semana, setSemana] = useState<
+    Record<string, Clase[]> | null
+  >(null);
+
+useEffect(() => {
+  setSemana(SEMANA_MOCK);
+}, []);
 
   const siguienteDia = () => {
     setDireccion(1);
@@ -125,6 +138,12 @@ const Entrenador: React.FC = () => {
       scale: 0.96,
     }),
   };
+
+  if (!semana) {
+    return (
+      <div className="min-h-screen bg-[#0f172a]" />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0f172a] p-2 md:p-6 text-white">
@@ -227,13 +246,13 @@ const Entrenador: React.FC = () => {
                           <Users size={16} />
 
                           <span>
-                            {clase.alumnos.length} alumnos
+                            {(clase.alumnos?.length ?? 0)} alumnos
                           </span>
                         </div>
                       </div>
 
                       <div className="flex flex-wrap gap-2">
-                        {clase.alumnos.map((alumno) => (
+                        {clase?.alumnos?.length && clase.alumnos.map((alumno) => (
                           <div
                             key={alumno.id}
                             className="rounded-xl bg-slate-700 px-3 py-2 text-sm text-slate-100"
@@ -294,9 +313,9 @@ const Entrenador: React.FC = () => {
                   </span>
                 </div>
 
-                {DIAS.map((dia) => (<>
+                {DIAS.map((dia, index) => (<>
                   <div
-                    key={`dia_${dia}`}
+                    key={`dia_${dia}_${index}`}
                     className="border-r border-slate-800 p-4 text-center font-bold text-[#D5D318]"
                   >
                     <span className="md:hidden">{dia.charAt(0)}</span>
@@ -335,7 +354,7 @@ const Entrenador: React.FC = () => {
                           {clase?.alumnos.length}
                         </div>
 
-                        <div className="mt-2 text-xs text-slate-500">
+                        <div className="hidden md:block mt-2 text-xs text-slate-500">
                           registrados
                         </div>
                       </motion.div>
