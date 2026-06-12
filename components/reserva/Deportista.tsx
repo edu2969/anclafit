@@ -2,10 +2,10 @@
 
 import React, { useMemo } from 'react';
 import {
-  CalendarDays,
-  Clock3,
-  CheckCircle2,
-} from 'lucide-react';
+  FiCalendar,
+  FiClock,
+  FiCheckCircle,
+} from "react-icons/fi";
 import { motion } from 'framer-motion';
 
 interface ClaseDeportista {
@@ -74,7 +74,7 @@ const ProgressBar = ({
           duration: 0.8,
           ease: 'easeOut',
         }}
-        className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500"
+        className="h-full rounded-full bg-linear-to-r from-cyan-400 to-blue-500"
       />
     </div>
   );
@@ -91,7 +91,7 @@ const Deportista: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#0f172a] p-6 text-white">
+    <div className="min-h-screen bg-[#0f172a] p-0 pd:p-6 text-white">
       <div className="mx-auto max-w-5xl">
         {/* HEADER */}
         <motion.div
@@ -103,11 +103,11 @@ const Deportista: React.FC = () => {
             opacity: 1,
             y: 0,
           }}
-          className="mb-8 rounded-3xl bg-gradient-to-r from-cyan-500 to-blue-600 p-8 shadow-2xl"
+          className="mb-8 rounded-3xl rounded-t-none md:rounded-t-3xl bg-linear-to-r from-cyan-500 to-blue-600 p-8 shadow-2xl"
         >
           <div className="flex items-center gap-4">
             <div className="rounded-2xl bg-white/20 p-4 backdrop-blur-xl">
-              <CalendarDays size={34} />
+              <FiCalendar size={34} />
             </div>
 
             <div>
@@ -200,7 +200,7 @@ const Deportista: React.FC = () => {
                           </h3>
 
                           <div className="mt-2 flex items-center gap-2 text-slate-300">
-                            <Clock3 size={16} />
+                            <FiClock size={16} />
 
                             <span>{clase.horario}</span>
                           </div>
@@ -208,7 +208,7 @@ const Deportista: React.FC = () => {
 
                         {clase.asistio && (
                           <div className="rounded-full bg-cyan-500/20 p-2 text-cyan-300">
-                            <CheckCircle2 size={26} />
+                            <FiCheckCircle size={26} />
                           </div>
                         )}
                       </div>

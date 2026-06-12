@@ -1,5 +1,7 @@
-import "./globals.css";
+import "../globals.css";
 import { Quicksand } from "next/font/google";
+import AuthProvider from "@/app/providers/AuthProvider";
+import Nav from "@/components/Nav";
 
 const quicksand = Quicksand({
   subsets: ["latin"],
@@ -17,7 +19,12 @@ export default function RootLayout({
       lang="en"
       className={`${quicksand.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <AuthProvider>
+          {children}
+          <Nav />
+        </AuthProvider>
+      </body>
     </html>
   );
 }

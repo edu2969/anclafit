@@ -2,12 +2,12 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  ChevronLeft,
-  ChevronRight,
-  CalendarDays,
-  Users,
-  Clock,
-} from 'lucide-react';
+  FiChevronLeft,
+  FiChevronRight,
+  FiCalendar,
+  FiUsers,
+  FiClock,
+} from "react-icons/fi";
 import { AnimatePresence, motion } from 'framer-motion';
 
 type Vista = 'dia' | 'semana';
@@ -150,6 +150,7 @@ useEffect(() => {
       <div className="mx-auto max-w-7xl">
         {/* HEADER */}
         <div className="mb-2 flex flex-col gap-4 rounded-3xl bg-slate-900/80 p-2 shadow-2xl backdrop-blur-xl md:flex-row md:items-center md:justify-between">
+        
           <div>
             <h1 className="text-4xl font-black tracking-tight">
               Tu panel
@@ -191,11 +192,11 @@ useEffect(() => {
             onClick={anteriorDia}
             className="flex items-center gap-2 rounded-2xl bg-slate-800 px-5 py-3 transition hover:bg-slate-700"
           >
-            <ChevronLeft size={20} />
+            <FiChevronLeft size={20} />
           </button>
 
           <div className="flex items-center gap-3 rounded-2xl bg-slate-800 px-6 py-4">
-            <CalendarDays className="text-[#D5D318]" />
+            <FiCalendar className="text-[#D5D318]" />
 
             <span className="text-2xl font-bold">
               {DIAS[diaActual]}
@@ -206,7 +207,7 @@ useEffect(() => {
             onClick={siguienteDia}
             className="flex items-center gap-2 rounded-2xl bg-slate-800 px-5 py-3 transition hover:bg-slate-700"
           >
-            <ChevronRight size={20} />
+            <FiChevronRight size={20} />
           </button>
         </div>}
 
@@ -243,7 +244,7 @@ useEffect(() => {
                         </div>
 
                         <div className="flex items-center gap-2 text-slate-400">
-                          <Users size={16} />
+                          <FiUsers size={16} />
 
                           <span>
                             {(clase.alumnos?.length ?? 0)} alumnos
@@ -307,13 +308,13 @@ useEffect(() => {
             >
               <div className="grid grid-cols-7 border-b border-slate-800">
                 <div className="border-r border-slate-800 p-4 font-bold text-slate-500">
-                  <span className="md:hidden"><Clock size={24}/></span>
+                  <span className="md:hidden"><FiClock size={24}/></span>
                   <span className="hidden md:block">
                     Horario
                   </span>
                 </div>
 
-                {DIAS.map((dia, index) => (<>
+                {DIAS.map((dia, index) => (
                   <div
                     key={`dia_${dia}_${index}`}
                     className="border-r border-slate-800 p-4 text-center font-bold text-[#D5D318]"
@@ -321,7 +322,6 @@ useEffect(() => {
                     <span className="md:hidden">{dia.charAt(0)}</span>
                     <span className="hidden md:block">{dia}</span>
                   </div>
-                  </>
                 ))}
               </div>
 
