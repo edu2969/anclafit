@@ -18,12 +18,11 @@ const HorarioConfig: React.FC = () => {
 
       <div className="relative z-10 mx-auto max-w-5xl">
         <div className="bg-slate-900/80 p-4 md:p-8">
-          {/* HEADER */}
           <div className="flex space-x-4 mb-8">
             <LuCalendarClock size={64} />
             <div>
               <h1 className="text-4xl font-black tracking-tight">
-                Configuración de Horarios
+                Horarios
               </h1>
               <p className="mt-2 text-slate-400">
                 Administra horarios de clases, disponibilidad de la app y
@@ -32,7 +31,6 @@ const HorarioConfig: React.FC = () => {
             </div>
           </div>
 
-          {/* Cada sección carga y persiste su propia data en MongoDB. */}
           <HorariosClases />
           <HorariosHabiles />
           <BloqueosHorarios />

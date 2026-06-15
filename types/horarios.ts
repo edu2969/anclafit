@@ -19,6 +19,19 @@ export interface HorarioClase {
   // "Horario especial": no todos los alumnos pueden tomar esta clase.
   especial: boolean;
   dias: HorarioDia[];
+  // Deportistas (user ids) permitidos para tomar este horario.
+  allowedIds?: string[];
+  // Deportistas (user ids) bloqueados para este horario.
+  blockedIds?: string[];
+}
+
+// Usuario en versión reducida para listados/avatares (colección: users).
+export interface UsuarioBasico {
+  _id: string;
+  name: string;
+  email: string;
+  role: "DEPORTISTA" | "ENTRENADOR";
+  image?: string;
 }
 
 // Rango horario hábil global (colección: horarios_habiles).

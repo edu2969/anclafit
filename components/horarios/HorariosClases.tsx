@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   FiPlus,
   FiTrash2,
@@ -8,23 +8,139 @@ import {
   FiChevronDown,
   FiEdit2,
   FiStar,
+  FiSave,
+  FiX,
+  FiUserCheck,
+  FiUserX,
 } from "react-icons/fi";
 
 import { withRecurso, type RecursoProps } from "./withRecurso";
 import {
   DIAS_SEMANA,
-  HORAS,
   type HorarioClase,
   type HorarioDia,
   type RangoHorario,
+  type UsuarioBasico,
 } from "@/types/horarios";
 
 type Props = RecursoProps<HorarioClase>;
+
+type ListaUsuarios = "allowedIds" | "blockedIds";
 
 const nuevoRangoId = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+
+const iniciales = (name: string) =>
+  name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("") || "?";
+
+// Círculo con la imagen del avatar o, en su defecto, las iniciales.
+// El `ring` distingue la lista (permitidos / bloqueados).
+const Avatar: React.FC<{
+  usuario?: UsuarioBasico;
+  ring: string;
+  size?: number;
+}> = ({ usuario, ring, size = 28 }) => {
+  const estilo = { width: size, height: size };
+
+  if (usuario?.image) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={usuario.image}
+        alt={usuario.name}
+        title={usuario.name}
+        style={estilo}
+        className={`rounded-full object-cover ring-2 ${ring} bg-slate-800`}
+      />
+    );
+  }
+
+  return (
+    <div
+      style={estilo}
+      title={usuario?.name}
+      className={`flex items-center justify-center rounded-full bg-slate-700 text-[10px] font-bold text-white ring-2 ${ring}`}
+    >
+      {usuario ? iniciales(usuario.name) : "?"}
+    </div>
+  );
+};
+
+// Editor de una lista (permitidos o bloqueados) visible al editar el horario.
+const EditorLista: React.FC<{
+  clase: HorarioClase;
+  lista: ListaUsuarios;
+  usuarios: UsuarioBasico[];
+  usuariosMap: Map<string, UsuarioBasico>;
+  onAgregar: (clase: HorarioClase, userId: string, lista: ListaUsuarios) => void;
+  onQuitar: (clase: HorarioClase, userId: string, lista: ListaUsuarios) => void;
+}> = ({ clase, lista, usuarios, usuariosMap, onAgregar, onQuitar }) => {
+  const esBloqueo = lista === "blockedIds";
+  const ids = clase[lista] ?? [];
+  const ring = esBloqueo ? "ring-red-500" : "ring-emerald-500";
+  const color = esBloqueo ? "text-red-400" : "text-emerald-400";
+  const disponibles = usuarios.filter((u) => !ids.includes(u._id));
+
+  return (
+    <div>
+      <div
+        className={`mb-2 flex items-center gap-2 text-sm font-semibold ${color}`}
+      >
+        {esBloqueo ? <FiUserX size={16} /> : <FiUserCheck size={16} />}
+        {esBloqueo ? "Bloqueados" : "Permitidos"}
+        <span className="text-xs text-slate-500">({ids.length})</span>
+      </div>
+
+      <div className="mb-2 flex flex-wrap gap-2">
+        {ids.length === 0 && (
+          <span className="text-xs text-slate-500">Ninguno.</span>
+        )}
+
+        {ids.map((id) => {
+          const u = usuariosMap.get(id);
+          return (
+            <span
+              key={id}
+              className="flex items-center gap-2 rounded-full bg-slate-800 py-1 pl-1 pr-2 text-xs text-slate-100"
+            >
+              <Avatar usuario={u} ring={ring} size={24} />
+              {u?.name ?? "Desconocido"}
+              <button
+                onClick={() => onQuitar(clase, id, lista)}
+                title="Quitar"
+                className="text-slate-400 transition hover:text-red-400"
+              >
+                <FiX size={14} />
+              </button>
+            </span>
+          );
+        })}
+      </div>
+
+      <select
+        value=""
+        onChange={(e) => {
+          if (e.target.value) onAgregar(clase, e.target.value, lista);
+        }}
+        className="w-full rounded-lg border-2 border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none focus:border-[#D5D318]"
+      >
+        <option value="">+ Agregar deportista…</option>
+        {disponibles.map((u) => (
+          <option key={u._id} value={u._id}>
+            {u.name} — {u.email}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+};
 
 const HorariosClasesView: React.FC<Props> = ({
   items,
@@ -44,6 +160,34 @@ const HorariosClasesView: React.FC<Props> = ({
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [nombreEditado, setNombreEditado] = useState("");
 
+  // Catálogo de deportistas para asignar/bloquear y mostrar avatares.
+  const [usuarios, setUsuarios] = useState<UsuarioBasico[]>([]);
+
+  useEffect(() => {
+    let activo = true;
+
+    (async () => {
+      try {
+        const res = await fetch("/api/users");
+        if (!res.ok) return;
+
+        const json = await res.json();
+        if (activo) setUsuarios((json.data as UsuarioBasico[]) ?? []);
+      } catch {
+        /* el catálogo es opcional; si falla solo no hay sugerencias */
+      }
+    })();
+
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  const usuariosMap = useMemo(
+    () => new Map(usuarios.map((u) => [u._id, u])),
+    [usuarios]
+  );
+
   const toggleColapsar = (id: string) => {
     setColapsados((prev) => {
       const next = new Set(prev);
@@ -61,6 +205,8 @@ const HorariosClasesView: React.FC<Props> = ({
       nombre,
       especial: nuevoEspecial,
       dias: DIAS_SEMANA.map((dia) => ({ dia, rangos: [] })),
+      allowedIds: [],
+      blockedIds: [],
     });
 
     setNuevoNombre("");
@@ -122,11 +268,47 @@ const HorariosClasesView: React.FC<Props> = ({
     );
   };
 
+  // Agrega un deportista a una lista, asegurando exclusividad entre listas
+  // (no puede estar permitido y bloqueado a la vez).
+  const agregarUsuario = (
+    clase: HorarioClase,
+    userId: string,
+    lista: ListaUsuarios
+  ) => {
+    if (!userId) return;
+
+    const otra: ListaUsuarios =
+      lista === "allowedIds" ? "blockedIds" : "allowedIds";
+    const actual = clase[lista] ?? [];
+    if (actual.includes(userId)) return;
+
+    actualizar(clase._id, {
+      [lista]: [...actual, userId],
+      [otra]: (clase[otra] ?? []).filter((id) => id !== userId),
+    });
+  };
+
+  const quitarUsuario = (
+    clase: HorarioClase,
+    userId: string,
+    lista: ListaUsuarios
+  ) => {
+    actualizar(clase._id, {
+      [lista]: (clase[lista] ?? []).filter((id) => id !== userId),
+    });
+  };
+
+  // Persiste el nombre editado (sin salir del modo edición).
   const guardarNombre = (clase: HorarioClase) => {
     const nombre = nombreEditado.trim();
     if (nombre && nombre !== clase.nombre) {
       actualizar(clase._id, { nombre });
     }
+  };
+
+  // Guarda y cierra el modo edición (botón disco).
+  const terminarEdicion = (clase: HorarioClase) => {
+    guardarNombre(clase);
     setEditandoId(null);
     setNombreEditado("");
   };
@@ -139,6 +321,297 @@ const HorariosClasesView: React.FC<Props> = ({
           <FiLoader className="animate-spin text-slate-400" size={20} />
         )}
       </div>
+
+      {loading ? (
+        <p className="text-slate-400">Cargando...</p>
+      ) : (
+        <div className="space-y-4">
+          {items.length === 0 && (
+            <p className="text-sm text-slate-500">
+              Aún no hay horarios de clases. Crea el primero arriba.
+            </p>
+          )}
+
+          {items.map((clase) => {
+            const expandido = !colapsados.has(clase._id);
+            const editando = editandoId === clase._id;
+            const totalRangos = clase.dias.reduce(
+              (acc, d) => acc + d.rangos.length,
+              0
+            );
+
+            const permitidos = (clase.allowedIds ?? [])
+              .map((id) => usuariosMap.get(id))
+              .filter(Boolean) as UsuarioBasico[];
+            const bloqueados = (clase.blockedIds ?? [])
+              .map((id) => usuariosMap.get(id))
+              .filter(Boolean) as UsuarioBasico[];
+
+            return (
+              <div
+                key={clase._id}
+                className="rounded-3xl border border-slate-800 bg-slate-950/70 p-6"
+              >
+                {/* Header de la clase */}
+                <div className="flex items-center justify-between mb-4">
+                  <button
+                    onClick={() => toggleColapsar(clase._id)}
+                    className="flex items-center gap-3 flex-1"
+                  >
+                    <FiChevronDown
+                      size={24}
+                      className={`transition ${
+                        expandido ? "rotate-0" : "-rotate-90"
+                      }`}
+                    />
+                    <div className="text-left">
+                      {editando ? (
+                        <>
+                        <input
+                          autoFocus
+                          type="text"
+                          value={nombreEditado}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => setNombreEditado(e.target.value)}
+                          onBlur={() => guardarNombre(clase)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") terminarEdicion(clase);
+                          }}
+                          className="rounded-lg border-2 border-[#D5D318] bg-slate-900 px-3 py-1 text-xl font-bold text-white outline-none w-11/12"
+                        />
+                        {/* Toggle especial */}
+                  <div className="py-2">
+                  <label
+                    className="mr-2 flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-300 select-none"
+                    title="No todos los alumnos podrán tomar esta clase."
+                  >
+                    <input
+                      type="checkbox"
+                      checked={clase.especial}
+                      onChange={(e) =>
+                        actualizar(clase._id, { especial: e.target.checked })
+                      }
+                      className="h-4 w-4 accent-[#D5D318]"
+                    />
+                    Especial
+                  </label>
+                  </div>
+                        </>
+                      ) : (
+                        <h3 className="flex items-center gap-2 text-xl font-bold">
+                          {clase.nombre}
+                          {clase.especial && (
+                            <span className="flex items-center gap-1 rounded-full bg-[#D5D318]/20 px-2 py-0.5 text-xs font-semibold text-[#D5D318]">
+                              <FiStar size={12} />
+                              Especial
+                            </span>
+                          )}
+                        </h3>
+                      )}
+                      <p className="text-sm text-slate-400">
+                        {totalRangos} intervalos configurados
+                      </p>
+
+                      {/* Cápsulas de avatares por lista */}
+                      {(permitidos.length > 0 || bloqueados.length > 0) && (
+                        <div className="mt-2 flex flex-wrap items-center gap-3">
+                          {permitidos.length > 0 && (
+                            <div className="flex items-center gap-1.5">
+                              <FiUserCheck
+                                size={14}
+                                className="text-emerald-400"
+                              />
+                              <div className="flex -space-x-2">
+                                {permitidos.map((u) => (
+                                  <Avatar
+                                    key={u._id}
+                                    usuario={u}
+                                    ring="ring-emerald-500"
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {bloqueados.length > 0 && (
+                            <div className="flex items-center gap-1.5">
+                              <FiUserX size={14} className="text-red-400" />
+                              <div className="flex -space-x-2">
+                                {bloqueados.map((u) => (
+                                  <Avatar
+                                    key={u._id}
+                                    usuario={u}
+                                    ring="ring-red-500"
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+
+                  {editando ? (
+                    <>
+                      <button
+                        onClick={() => terminarEdicion(clase)}
+                        title="Guardar"
+                        className="flex h-10 w-10 items-center justify-center text-emerald-400 transition hover:bg-emerald-500/20 rounded-lg"
+                      >
+                        <FiSave size={18} />
+                      </button>
+
+                      <button
+                        onClick={() => eliminar(clase._id)}
+                        title="Eliminar horario"
+                        className="flex h-10 w-10 items-center justify-center text-red-400 transition hover:bg-red-500/25 rounded-lg"
+                      >
+                        <FiTrash2 size={18} />
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setEditandoId(clase._id);
+                        setNombreEditado(clase.nombre);
+                      }}
+                      title="Editar"
+                      className="flex h-10 w-10 items-center justify-center text-slate-400 transition hover:text-[#D5D318]"
+                    >
+                      <FiEdit2 size={18} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Panel de asignación (solo al editar) */}
+                {editando && (
+                  <div className="mb-4 grid gap-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 md:grid-cols-2">
+                    <EditorLista
+                      clase={clase}
+                      lista="allowedIds"
+                      usuarios={usuarios}
+                      usuariosMap={usuariosMap}
+                      onAgregar={agregarUsuario}
+                      onQuitar={quitarUsuario}
+                    />
+                    <EditorLista
+                      clase={clase}
+                      lista="blockedIds"
+                      usuarios={usuarios}
+                      usuariosMap={usuariosMap}
+                      onAgregar={agregarUsuario}
+                      onQuitar={quitarUsuario}
+                    />
+                  </div>
+                )}
+
+                {/* Contenido expandido */}
+                {expandido && (
+                  <div className="mt-4 space-y-4 pl-8 border-l-2 border-slate-700">
+                    {clase.dias.map((diaCfg) => (
+                      <div
+                        key={diaCfg.dia}
+                        className="rounded-2xl bg-slate-900 p-4"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-bold text-[#D5D318]">
+                            {diaCfg.dia}
+                          </h4>
+                          <button
+                            onClick={() => agregarRango(clase, diaCfg.dia)}
+                            className="text-xs flex items-center gap-1 rounded-lg bg-slate-800 px-2 py-1 transition hover:bg-slate-700"
+                          >
+                            <FiPlus size={14} />
+                            Rango
+                          </button>
+                        </div>
+
+                        <div className="space-y-2">
+                          {diaCfg.rangos.length === 0 && (
+                            <p className="text-xs text-slate-500">
+                              Sin rangos.
+                            </p>
+                          )}
+
+                          {diaCfg.rangos.map((rango) => {
+                            const invalido = rango.termino <= rango.inicio;
+
+                            return (
+                              <div
+                                key={rango.id}
+                                className="flex gap-2 items-center"
+                              >
+                                <input
+                                  type="time"
+                                  step="900"
+                                  value={rango.inicio}
+                                  min="07:00"
+                                  onChange={(e) =>
+                                    actualizarRango(
+                                      clase,
+                                      diaCfg.dia,
+                                      rango.id,
+                                      "inicio",
+                                      e.target.value
+                                    )
+                                  }
+                                  className={`text-sm rounded-lg border-2 bg-slate-800 px-3 py-1 text-white outline-none [color-scheme:dark] ${
+                                    invalido
+                                      ? "border-red-500"
+                                      : "border-slate-600"
+                                  }`}
+                                />
+
+                                <div className="text-slate-500">→</div>
+
+                                <input
+                                  type="time"
+                                  step={900}
+                                  value={rango.termino}
+                                  onChange={(e) =>
+                                    actualizarRango(
+                                      clase,
+                                      diaCfg.dia,
+                                      rango.id,
+                                      "termino",
+                                      e.target.value
+                                    )
+                                  }
+                                  className={`text-sm rounded-lg border-2 bg-slate-800 px-3 py-1 text-white outline-none [color-scheme:dark] ${
+                                    invalido
+                                      ? "border-red-500"
+                                      : "border-slate-600"
+                                  }`}
+                                />
+
+                                <button
+                                  onClick={() =>
+                                    eliminarRango(clase, diaCfg.dia, rango.id)
+                                  }
+                                  className="flex h-8 w-8 items-center justify-center text-red-400 transition hover:bg-red-500/25 rounded-lg"
+                                >
+                                  <FiTrash2 size={16} />
+                                </button>
+
+                                {invalido && (
+                                  <div className="text-xs text-red-400">
+                                    *Inválido
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Formulario de creación */}
       <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 md:flex-row md:items-center">
@@ -181,219 +654,6 @@ const HorariosClasesView: React.FC<Props> = ({
         <p className="mb-4 rounded-xl bg-red-500/10 px-4 py-2 text-sm text-red-300">
           {error}
         </p>
-      )}
-
-      {loading ? (
-        <p className="text-slate-400">Cargando...</p>
-      ) : (
-        <div className="space-y-4">
-          {items.length === 0 && (
-            <p className="text-sm text-slate-500">
-              Aún no hay horarios de clases. Crea el primero arriba.
-            </p>
-          )}
-
-          {items.map((clase) => {
-            const expandido = !colapsados.has(clase._id);
-            const totalRangos = clase.dias.reduce(
-              (acc, d) => acc + d.rangos.length,
-              0
-            );
-
-            return (
-              <div
-                key={clase._id}
-                className="rounded-3xl border border-slate-800 bg-slate-950/70 p-6"
-              >
-                {/* Header de la clase */}
-                <div className="flex items-center justify-between mb-4">
-                  <button
-                    onClick={() => toggleColapsar(clase._id)}
-                    className="flex items-center gap-3 flex-1"
-                  >
-                    <FiChevronDown
-                      size={24}
-                      className={`transition ${
-                        expandido ? "rotate-0" : "-rotate-90"
-                      }`}
-                    />
-                    <div className="text-left">
-                      {editandoId === clase._id ? (
-                        <input
-                          autoFocus
-                          type="text"
-                          value={nombreEditado}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => setNombreEditado(e.target.value)}
-                          onBlur={() => guardarNombre(clase)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") guardarNombre(clase);
-                          }}
-                          className="rounded-lg border-2 border-[#D5D318] bg-slate-900 px-3 py-1 text-xl font-bold text-white outline-none"
-                        />
-                      ) : (
-                        <h3 className="flex items-center gap-2 text-xl font-bold">
-                          {clase.nombre}
-                          {clase.especial && (
-                            <span className="flex items-center gap-1 rounded-full bg-[#D5D318]/20 px-2 py-0.5 text-xs font-semibold text-[#D5D318]">
-                              <FiStar size={12} />
-                              Especial
-                            </span>
-                          )}
-                        </h3>
-                      )}
-                      <p className="text-sm text-slate-400">
-                        {totalRangos} intervalos configurados
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* Toggle especial */}
-                  <label
-                    className="mr-2 flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-300 select-none"
-                    title="No todos los alumnos podrán tomar esta clase."
-                  >
-                    <input
-                      type="checkbox"
-                      checked={clase.especial}
-                      onChange={(e) =>
-                        actualizar(clase._id, { especial: e.target.checked })
-                      }
-                      className="h-4 w-4 accent-[#D5D318]"
-                    />
-                    Especial
-                  </label>
-
-                  <button
-                    onClick={() => {
-                      setEditandoId(clase._id);
-                      setNombreEditado(clase.nombre);
-                    }}
-                    className="flex h-10 w-10 items-center justify-center text-slate-400 transition hover:text-[#D5D318]"
-                  >
-                    <FiEdit2 size={18} />
-                  </button>
-
-                  <button
-                    onClick={() => eliminar(clase._id)}
-                    className="flex h-10 w-10 items-center justify-center text-red-400 transition hover:bg-red-500/25 rounded-lg"
-                  >
-                    <FiTrash2 size={18} />
-                  </button>
-                </div>
-
-                {/* Contenido expandido */}
-                {expandido && (
-                  <div className="mt-4 space-y-4 pl-8 border-l-2 border-slate-700">
-                    {clase.dias.map((diaCfg) => (
-                      <div
-                        key={diaCfg.dia}
-                        className="rounded-2xl bg-slate-900 p-4"
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-bold text-[#D5D318]">
-                            {diaCfg.dia}
-                          </h4>
-                          <button
-                            onClick={() => agregarRango(clase, diaCfg.dia)}
-                            className="text-xs flex items-center gap-1 rounded-lg bg-slate-800 px-2 py-1 transition hover:bg-slate-700"
-                          >
-                            <FiPlus size={14} />
-                            Rango
-                          </button>
-                        </div>
-
-                        <div className="space-y-2">
-                          {diaCfg.rangos.length === 0 && (
-                            <p className="text-xs text-slate-500">
-                              Sin rangos.
-                            </p>
-                          )}
-
-                          {diaCfg.rangos.map((rango) => {
-                            const invalido = rango.termino <= rango.inicio;
-
-                            return (
-                              <div
-                                key={rango.id}
-                                className="flex gap-2 items-center"
-                              >
-                                <select
-                                  value={rango.inicio}
-                                  onChange={(e) =>
-                                    actualizarRango(
-                                      clase,
-                                      diaCfg.dia,
-                                      rango.id,
-                                      "inicio",
-                                      e.target.value
-                                    )
-                                  }
-                                  className={`text-sm rounded-lg border-2 bg-slate-800 px-3 py-1 text-white outline-none ${
-                                    invalido
-                                      ? "border-red-500"
-                                      : "border-slate-600"
-                                  }`}
-                                >
-                                  {HORAS.map((hora) => (
-                                    <option key={hora} value={hora}>
-                                      {hora}
-                                    </option>
-                                  ))}
-                                </select>
-
-                                <div className="text-slate-500">→</div>
-
-                                <select
-                                  value={rango.termino}
-                                  onChange={(e) =>
-                                    actualizarRango(
-                                      clase,
-                                      diaCfg.dia,
-                                      rango.id,
-                                      "termino",
-                                      e.target.value
-                                    )
-                                  }
-                                  className={`text-sm rounded-lg border-2 bg-slate-800 px-3 py-1 text-white outline-none ${
-                                    invalido
-                                      ? "border-red-500"
-                                      : "border-slate-600"
-                                  }`}
-                                >
-                                  {HORAS.map((hora) => (
-                                    <option key={hora} value={hora}>
-                                      {hora}
-                                    </option>
-                                  ))}
-                                </select>
-
-                                <button
-                                  onClick={() =>
-                                    eliminarRango(clase, diaCfg.dia, rango.id)
-                                  }
-                                  className="flex h-8 w-8 items-center justify-center text-red-400 transition hover:bg-red-500/25 rounded-lg"
-                                >
-                                  <FiTrash2 size={16} />
-                                </button>
-
-                                {invalido && (
-                                  <div className="text-xs text-red-400">
-                                    *Inválido
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
       )}
     </div>
   );
